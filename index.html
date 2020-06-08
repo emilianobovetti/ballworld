@@ -74,7 +74,13 @@ const addPolyline = atts =>
     ...atts,
   });
 
+const ballRadius = (Math.max(windowHeight, windowWidth) / 100) | 0;
+const gridSize = ballRadius * 2;
+
+const randComp = () => (Math.random() * 256 | 0).toString(16);
+const randColor = () => `#${randComp()}${randComp()}${randComp()}`;
 const bound = (num, min, max) => Math.max(min, Math.min(max, num));
+const hashXY = (x, y) => `${(x / gridSize) | 0},${(y / gridSize) | 0}`;
 
 const stepMs = 40;
 const deltaT = stepMs / 1000;
@@ -82,12 +88,16 @@ const resistance = -0.00005;
 const gravAcceleration = { x: 0, y: 300 };
 
 const ballStates = [];
+const ballHashes = Object.create(null);
 
 const updateBallPosition = (state, ballIdx) => {
   const { position, velocity, svg } = state;
+  let { coordsHash } = state;
   let { x: posX, y: posY } = position;
   let { x: velX, y: velY } = velocity;
   let { x: accX, y: accY } = gravAcceleration;
+
+  delete ballHashes[coordsHash];
 
   velX += accX * deltaT;
   velY += accY * deltaT;
@@ -117,10 +127,23 @@ const updateBallPosition = (state, ballIdx) => {
     velY = -velY;
   }
 
+  coordsHash = hashXY(posX, posY);
+  const collidingBall = ballHashes[coordsHash];
+
+  if (collidingBall != null) {
+    // collision detected
+    const color = randColor();
+    svg.setAttribute('fill', color);
+    collidingBall.svg.setAttribute('fill', color);
+  } else {
+    ballHashes[coordsHash] = state;
+  }
+
   position.x = posX;
   position.y = posY;
   velocity.x = velX;
   velocity.y = velY;
+  state.coordsHash = coordsHash;
 };
 
 const animationId = setInterval(() => {
@@ -129,7 +152,10 @@ const animationId = setInterval(() => {
 
 const launchBall = state => {
   const { position } = state;
-  state.svg = addCircle({ cx: position.x, cy: position.y });
+  const { x, y } = position;
+
+  state.svg = addCircle({ cx: x, cy: y, r: ballRadius });
+  state.coordsHash = hashXY(x, y);
 
   ballStates.push(state);
 };
