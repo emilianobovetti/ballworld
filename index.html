@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+  <title>ballworld</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    html, body, svg {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      width: 100%
+    }
+
+    svg {
+      position: absolute;
+      left: 0;
+      top: 0;
+    }
+  </style>
+</head>
+
+<body>
+<script type="module">
+// TODO: update on screen resize
+let windowHeight = window.innerHeight;
+let windowWidth = window.innerWidth;
+
+const setAttributes = (elem, atts) => {
+  for (const key in atts) {
+    elem.setAttribute(key, atts[key]);
+  }
+
+  return elem;
+};
+
+const createSvgElement = (name, atts = {}) => {
+  const elem = document.createElementNS('http://www.w3.org/2000/svg', name);
+
+  return setAttributes(elem, atts);
+};
+
+const svg = createSvgElement('svg');
+document.body.appendChild(svg);
+
+const addSvg = (name, atts = {}) => {
+  const elem = createSvgElement(name, atts);
+
+  svg.appendChild(elem);
+
+  return elem;
+};
+
+const removeSvg = elem =>
+  svg.removeChild(elem);
+
+const addCircle = atts =>
+  addSvg('circle', {
+    cx: 0,
+    cy: 0,
+    r: 8,
+    fill: 'black',
+    ...atts,
+  });
+
+const addPolyline = atts =>
+  addSvg('polyline', {
+    fill: 'none',
+    stroke: 'black',
+    'stroke-width': 1,
+    ...atts,
+  });
+
+const bound = (num, min, max) => Math.max(min, Math.min(max, num));
+
+const stepMs = 40;
+const deltaT = stepMs / 1000;
+const resistance = -0.00005;
+const gravAcceleration = { x: 0, y: 300 };
+
+const ballStates = [];
+
+const updateBallPosition = (state, ballIdx) => {
+  const { position, velocity, svg } = state;
+  let { x: posX, y: posY } = position;
+  let { x: velX, y: velY } = velocity;
+  let { x: accX, y: accY } = gravAcceleration;
+
+  velX += accX * deltaT;
+  velY += accY * deltaT;
+  let velMod = Math.sqrt(velX * velX + velY * velY);
+  let velDamp = Math.exp(velMod * resistance);
+  velX *= velDamp;
+  velY *= velDamp;
+
+  posX += velX * deltaT;
+  posY += velY * deltaT;
+
+  if (velMod < 6 && windowHeight - posY < 1) {
+    ballStates.splice(ballIdx, 1);
+  }
+
+  svg.setAttribute('cx', posX);
+  svg.setAttribute('cy', posY);
+
+  // TODO: consider ball radius
+  if (posX <= 0 || posX >= windowWidth) {
+    posX = bound(posX, 0, windowWidth);
+    velX = -velX;
+  }
+
+  if (posY <= 0 || posY >= windowHeight) {
+    posY = bound(posY, 0, windowHeight);
+    velY = -velY;
+  }
+
+  position.x = posX;
+  position.y = posY;
+  velocity.x = velX;
+  velocity.y = velY;
+};
+
+const animationId = setInterval(() => {
+  ballStates.forEach(updateBallPosition);
+}, stepMs);
+
+const launchBall = state => {
+  const { position } = state;
+  state.svg = addCircle({ cx: position.x, cy: position.y });
+
+  ballStates.push(state);
+};
+
+const initDragState = ({ clientX: x, clientY: y }) => ({
+  fromX: x,
+  fromY: y,
+  toX: x,
+  toY: y,
+  line: addPolyline({ 'stroke-width': 3 }),
+});
+
+const handleDragMove = (state, { clientX: x, clientY: y }) => {
+  const { fromX, fromY } = state;
+  state.toX = x;
+  state.toY = y;
+
+  state.line.setAttribute('points', `${fromX},${fromY} ${x},${y}`);
+};
+
+const handleDragEnd = state => {
+  removeSvg(state.line);
+
+  const { fromX, fromY, toX, toY } = state;
+
+  const position = {
+    x: fromX,
+    y: fromY,
+  };
+
+  const velocity = {
+    x: toX - fromX,
+    y: toY - fromY,
+  };
+
+  launchBall({ position, velocity });
+};
+
+document.addEventListener('touchstart', event => {
+  // this prevents the `mousedown` event gets fired
+  // after `touchstart`
+  event.preventDefault()
+
+  // TODO: multitouch
+  const state = initDragState(event.touches[0]);
+
+  const onTouchMove = event => {
+    handleDragMove(state, event.touches[0]);
+  };
+
+  const onTouchEnd = event => {
+    document.removeEventListener('touchmove', onTouchMove);
+    document.removeEventListener('touchend', onTouchEnd);
+    handleDragEnd(state);
+  };
+
+  document.addEventListener('touchmove', onTouchMove);
+  document.addEventListener('touchend', onTouchEnd);
+}, { passive: false });
+
+document.addEventListener('mousedown', event => {
+  const state = initDragState(event);
+
+  const onMouseMove = event => {
+    handleDragMove(state, event);
+  };
+
+  const onMouseUp = event => {
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+    handleDragEnd(state);
+  };
+
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('mouseup', onMouseUp);
+});
+</script>
+</body>
+
+</html>

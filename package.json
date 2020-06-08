@@ -1,0 +1,9 @@
+{
+  "license": "GPL-3.0-or-later",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "devDependencies": {
+    "browser-sync": "^2.26.14"
+  }
+}
