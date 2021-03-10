@@ -83,6 +83,9 @@ const gravAcceleration = { x: 0, y: 300 };
 
 const ballStates = [];
 
+const distance = (p1, p2) =>
+  Math.sqrt((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2);
+
 const updateBallPosition = (state, ballIdx) => {
   const { position, velocity, svg } = state;
   let { x: posX, y: posY } = position;
@@ -121,6 +124,17 @@ const updateBallPosition = (state, ballIdx) => {
   position.y = posY;
   velocity.x = velX;
   velocity.y = velY;
+
+  ballStates.forEach((otherBallState, idx) => {
+    if (idx === ballIdx) {
+      return;
+    }
+
+    if (distance(otherBallState.position, position) < 16) {
+      state.velocity = otherBallState.velocity;
+      otherBallState.velocity = velocity;
+    }
+  });
 };
 
 const animationId = setInterval(() => {
